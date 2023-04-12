@@ -11,8 +11,9 @@ import (
 	"regexp"
 )
 
-func fetchHashesFromPage(page int) []string {
+func fetchHashesFromPage(page int) ([]string, []string) {
 	hashes := []string{}
+	exts := []string{}
 
 	url := fmt.Sprintf(
 		"https://www.suneung.re.kr/boardCnts/list.do?type=default&m=0403&boardID=1500234&searchType=S&C02=%EC%98%81%EC%96%B4&s=suneung&page=%d",
@@ -42,15 +43,28 @@ func fetchHashesFromPage(page int) []string {
 
 				if len(matches) > 1 {
 					hashes = append(hashes, matches[1])
+					fileTitle, exists := s.Attr("title")
+					if exists {
+						re := regexp.MustCompile(`\.(.+)$`)
+						extMatches := re.FindStringSubmatch(fileTitle)
+
+						if len(extMatches) > 1 {
+							exts = append(exts, fmt.Sprintf(".%s", extMatches[1]))
+						} else {
+							exts = append(exts, "")
+						}
+					} else {
+						exts = append(exts, "")
+					}
 				}
 			}
 		},
 	)
 
-	return hashes
+	return hashes, exts
 }
 
-func downloadFile(hash string) {
+func downloadFile(hash string, ext string) {
 	url := fmt.Sprintf("https://www.suneung.re.kr/boardCnts/fileDown.do?fileSeq=%s", hash)
 	response, err := http.Get(url)
 	if err != nil {
@@ -63,14 +77,12 @@ func downloadFile(hash string) {
 		panic(err)
 	}
 
-	// 'files' 디렉토리가 없으면 생성합니다.
 	err = os.MkdirAll("files", 0755)
 	if err != nil {
 		panic(err)
 	}
 
-	// 파일 경로를 'files' 디렉토리로 변경합니다.
-	filePath := filepath.Join("files", fmt.Sprintf("%s.zip", hash))
+	filePath := filepath.Join("files", fmt.Sprintf("%s%s", hash, ext))
 	err = ioutil.WriteFile(filePath, body, 0644)
 	if err != nil {
 		panic(err)
@@ -80,13 +92,19 @@ func downloadFile(hash string) {
 }
 
 func main() {
+
+	err := os.RemoveAll("files")
+	if err != nil {
+		panic(err)
+	}
+
 	startPage := 1
 	endPage := 5
 
 	for page := startPage; page <= endPage; page++ {
-		hashes := fetchHashesFromPage(page)
-		for _, hash := range hashes {
-			downloadFile(hash)
+		hashes, exts := fetchHashesFromPage(page)
+		for i, hash := range hashes {
+			downloadFile(hash, exts[i])
 		}
 	}
 }
