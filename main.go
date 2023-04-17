@@ -2,109 +2,80 @@ package main
 
 import (
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
 	"io/ioutil"
-	"log"
-	"net/http"
 	"os"
-	"path/filepath"
-	"regexp"
+
+	"rsc.io/pdf"
 )
 
-func fetchHashesFromPage(page int) ([]string, []string) {
-	hashes := []string{}
-	exts := []string{}
-
-	url := fmt.Sprintf(
-		"https://www.suneung.re.kr/boardCnts/list.do?type=default&m=0403&boardID=1500234&searchType=S&C02=%EC%98%81%EC%96%B4&s=suneung&page=%d",
-		page,
-	)
-	res, err := http.Get(url)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != 200 {
-		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-	}
-
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	doc.Find("a[onclick^=\"fn_fileDown\"]").Each(
-		func(i int, s *goquery.Selection) {
-			res, exists := s.Attr("onclick")
-			if exists {
-				re := regexp.MustCompile(`'([\w\d]+)'`)
-				matches := re.FindStringSubmatch(res)
-
-				if len(matches) > 1 {
-					hashes = append(hashes, matches[1])
-					fileTitle, exists := s.Attr("title")
-					if exists {
-						re := regexp.MustCompile(`\.(.+)$`)
-						extMatches := re.FindStringSubmatch(fileTitle)
-
-						if len(extMatches) > 1 {
-							exts = append(exts, fmt.Sprintf(".%s", extMatches[1]))
-						} else {
-							exts = append(exts, "")
-						}
-					} else {
-						exts = append(exts, "")
-					}
-				}
-			}
-		},
-	)
-
-	return hashes, exts
-}
-
-func downloadFile(hash string, ext string) {
-	url := fmt.Sprintf("https://www.suneung.re.kr/boardCnts/fileDown.do?fileSeq=%s", hash)
-	response, err := http.Get(url)
-	if err != nil {
-		panic(err)
-	}
-	defer response.Body.Close()
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	err = os.MkdirAll("files", 0755)
-	if err != nil {
-		panic(err)
-	}
-
-	filePath := filepath.Join("files", fmt.Sprintf("%s%s", hash, ext))
-	err = ioutil.WriteFile(filePath, body, 0644)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("File %s downloaded\n", filePath)
-}
-
 func main() {
+	inputFile := "example.pdf"
+	outputFile := "extracted_text.txt"
 
-	err := os.RemoveAll("files")
+	// PDF 파일에서 텍스트 추출
+	err := extractText(inputFile, outputFile)
 	if err != nil {
-		panic(err)
+		fmt.Printf("Error extracting text from PDF: %v\n", err)
+		return
 	}
 
-	startPage := 1
-	endPage := 5
+	// 추출된 텍스트 출력
+	text, err := ioutil.ReadFile(outputFile)
+	if err != nil {
+		fmt.Printf("Error reading extracted text file: %v\n", err)
+		return
+	}
 
-	for page := startPage; page <= endPage; page++ {
-		hashes, exts := fetchHashesFromPage(page)
-		for i, hash := range hashes {
-			downloadFile(hash, exts[i])
+	fmt.Printf("Extracted text:\n\n%s\n", string(text))
+}
+
+func extractText(inputFile, outputFile string) error {
+	// PDF 파일 열기
+	f, err := os.Open(inputFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// 파일 크기 확인
+	fileInfo, err := f.Stat()
+	if err != nil {
+		return err
+	}
+
+	// PDF 파일 읽기
+	pdfReader, err := pdf.NewReader(f, fileInfo.Size())
+	if err != nil {
+		return err
+	}
+
+	// 추출된 텍스트 저장할 파일 생성
+	o, err := os.Create(outputFile)
+	if err != nil {
+		return err
+	}
+	defer o.Close()
+
+	// 각 페이지에서 텍스트 추출
+	numPages := pdfReader.NumPage()
+	for pageIndex := 1; pageIndex <= numPages; pageIndex++ {
+		page := pdfReader.Page(pageIndex)
+		if page == (pdf.Page{}) {
+			return fmt.Errorf("failed to retrieve page %d", pageIndex)
+		}
+
+		// 해당 페이지에서 텍스트 추출
+		text := ""
+		content := page.Content()
+		for _, t := range content.Text {
+			text += t.S
+		}
+
+		// 추출된 텍스트를 파일에 쓰기
+		if _, err := o.WriteString(text + "\n"); err != nil {
+			return err
 		}
 	}
+
+	return nil
 }
