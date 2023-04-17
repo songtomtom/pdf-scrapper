@@ -1,80 +1,88 @@
+/*
+ * PDF to text: Extract all text for each page of a pdf file.
+ *
+ * Run as: go run pdf_extract_text.go input.pdf
+ */
+
 package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
-	"rsc.io/pdf"
+	"github.com/unidoc/unipdf/v3/common/license"
+	"github.com/unidoc/unipdf/v3/extractor"
+	"github.com/unidoc/unipdf/v3/model"
 )
 
-func main() {
-	inputFile := "example.pdf"
-	outputFile := "extracted_text.txt"
-
-	// PDF 파일에서 텍스트 추출
-	err := extractText(inputFile, outputFile)
+func init() {
+	// Make sure to load your metered License API key prior to using the library.
+	// If you need a key, you can sign up and create a free one at https://cloud.unidoc.io
+	err := license.SetMeteredKey("248ef9371120f0ef6693c453dea15bc7887a7fd639c4310e833e2e0b8397a50a")
 	if err != nil {
-		fmt.Printf("Error extracting text from PDF: %v\n", err)
-		return
+		panic(err)
 	}
-
-	// 추출된 텍스트 출력
-	text, err := ioutil.ReadFile(outputFile)
-	if err != nil {
-		fmt.Printf("Error reading extracted text file: %v\n", err)
-		return
-	}
-
-	fmt.Printf("Extracted text:\n\n%s\n", string(text))
 }
 
-func extractText(inputFile, outputFile string) error {
-	// PDF 파일 열기
-	f, err := os.Open(inputFile)
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Printf("Usage: go run pdf_extract_text.go input.pdf\n")
+		os.Exit(1)
+	}
+
+	inputPath := os.Args[1]
+
+	err := outputPdfText(inputPath)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// outputPdfText prints out contents of PDF file to stdout.
+func outputPdfText(inputPath string) error {
+	f, err := os.Open(inputPath)
 	if err != nil {
 		return err
 	}
+
 	defer f.Close()
 
-	// 파일 크기 확인
-	fileInfo, err := f.Stat()
+	pdfReader, err := model.NewPdfReader(f)
 	if err != nil {
 		return err
 	}
 
-	// PDF 파일 읽기
-	pdfReader, err := pdf.NewReader(f, fileInfo.Size())
+	numPages, err := pdfReader.GetNumPages()
 	if err != nil {
 		return err
 	}
 
-	// 추출된 텍스트 저장할 파일 생성
-	o, err := os.Create(outputFile)
-	if err != nil {
-		return err
-	}
-	defer o.Close()
+	fmt.Printf("--------------------\n")
+	fmt.Printf("PDF to text extraction:\n")
+	fmt.Printf("--------------------\n")
+	for i := 0; i < numPages; i++ {
+		pageNum := i + 1
 
-	// 각 페이지에서 텍스트 추출
-	numPages := pdfReader.NumPage()
-	for pageIndex := 1; pageIndex <= numPages; pageIndex++ {
-		page := pdfReader.Page(pageIndex)
-		if page == (pdf.Page{}) {
-			return fmt.Errorf("failed to retrieve page %d", pageIndex)
-		}
-
-		// 해당 페이지에서 텍스트 추출
-		text := ""
-		content := page.Content()
-		for _, t := range content.Text {
-			text += t.S
-		}
-
-		// 추출된 텍스트를 파일에 쓰기
-		if _, err := o.WriteString(text + "\n"); err != nil {
+		page, err := pdfReader.GetPage(pageNum)
+		if err != nil {
 			return err
 		}
+
+		ex, err := extractor.New(page)
+		if err != nil {
+			return err
+		}
+
+		text, err := ex.ExtractText()
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("------------------------------")
+		fmt.Printf("Page %d:\n", pageNum)
+		fmt.Printf("\"%s\"\n", text)
+		fmt.Println("------------------------------")
 	}
 
 	return nil
