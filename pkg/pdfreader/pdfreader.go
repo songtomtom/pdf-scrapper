@@ -1,4 +1,4 @@
-// pdfreader.go
+// padfreader.go
 
 package pdfreader
 

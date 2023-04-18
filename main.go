@@ -4,11 +4,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/joho/godotenv"
 	"github.com/unidoc/unipdf/v3/common/license"
 	"os"
-	"songtomtom/pdf-scrapper/pdfreader"
-
-	"github.com/joho/godotenv"
+	"songtomtom/pdf-scrapper/pkg/pdfreader"
 )
 
 func init() {
