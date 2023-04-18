@@ -13,6 +13,7 @@ require (
 	github.com/gorilla/i18n v0.0.0-20150820051429-8b358169da46 // indirect
 	github.com/hhrutter/lzw v1.0.0 // indirect
 	github.com/hhrutter/tiff v1.0.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.3 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/pdfcpu/pdfcpu v0.4.0 // indirect
