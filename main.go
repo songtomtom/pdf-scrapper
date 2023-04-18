@@ -4,42 +4,22 @@ package main
 
 import (
 	"fmt"
-	"github.com/joho/godotenv"
-	"github.com/unidoc/unipdf/v3/common/license"
-	"os"
-	"songtomtom/pdf-scrapper/pkg/pdfreader"
+	"songtomtom/pdf-scrapper/pdfscrapper"
 )
 
-func init() {
-
-	err := godotenv.Load()
-	if err != nil {
-		fmt.Println("Error loading .env file")
-	}
-
-	licenseKey := os.Getenv("UNIDOC_LICENSE_API_KEY")
-	if licenseKey == "" {
-		panic("UNIDOC_LICENSE_API_KEY environment variable not set")
-	}
-
-	err = license.SetMeteredKey(licenseKey)
-	if err != nil {
-		panic(err)
-	}
-}
+const (
+	homepageUrl = "https://www.suneung.re.kr/boardCnts/list.do?type=default&page=1&searchStr=&m=0403&C06=&boardID=1500234&C05=&C04=&C03=&C02=&searchType=S&C01=&s=suneung"
+)
 
 func main() {
 
-	if len(os.Args) < 2 {
-		fmt.Printf("Usage: go run main.go input.pdf\n")
-		os.Exit(1)
+	htmlString, err := pdfscrapper.FetchHTML(homepageUrl)
+	if err != nil {
+		panic(err)
 	}
 
-	inputPath := os.Args[1]
-
-	err := pdfreader.OutputPdfText(inputPath)
+	err = pdfscrapper.FindDivCntBody(htmlString)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
 	}
 }
